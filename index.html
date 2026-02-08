@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBA Trolley Challenge - FPS Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            overflow: hidden;
+            background: #000;
+            margin: 0;
+            color: white;
+        }
+
+        /* 3D空間の設定 */
+        .world {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            perspective: 600px;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #0f172a 0%, #1e293b 50%, #000 100%);
+        }
+
+        .camera-rig {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 線路のコンテナ */
+        .track-system {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 1000px;
+            height: 2000px;
+            transform: translateX(-50%) rotateX(75deg);
+            transform-origin: bottom;
+            transform-style: preserve-3d;
+        }
+
+        /* 枕木のアニメーション */
+        .sleeper {
+            position: absolute;
+            width: 340px;
+            height: 30px;
+            background: #4a3c31;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.8);
+        }
+
+        .rail {
+            position: absolute;
+            width: 12px;
+            height: 100%;
+            background: linear-gradient(to right, #777, #bbb, #777);
+            top: 0;
+        }
+
+        /* 通常の直線レール */
+        .rail-left { left: 330px; }
+        .rail-right { right: 330px; }
+
+        /* 分岐システム（初期は非表示） */
+        .branch-system {
+            position: absolute;
+            top: -1000px; /* 直線レールの先から開始 */
+            left: 0;
+            width: 100%;
+            height: 1000px;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        .branching .branch-system { opacity: 1; }
+
+        /* 左分岐（カーブ） */
+        .branch-left {
+            position: absolute;
+            bottom: 0;
+            left: -50%;
+            width: 100%; 
+            height: 100%;
+            border-right: 12px solid #bbb; /* 内側レール */
+            border-radius: 0 100% 0 0;
+            transform-origin: right bottom;
+            transform: scaleX(0.8); /* カーブの度合い調整 */
+        }
+        
+        .branch-left-outer {
+            position: absolute;
+            bottom: 0;
+            left: -84%; /* ゲージ幅分ずらす */
+            width: 100%;
+            height: 100%;
+            border-right: 12px solid #bbb; /* 外側レール */
+            border-radius: 0 100% 0 0;
+            transform-origin: right bottom;
+            transform: scaleX(0.8);
+        }
+
+        /* 右分岐（カーブ） */
+        .branch-right {
+            position: absolute;
+            bottom: 0;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            border-left: 12px solid #bbb; /* 内側レール */
+            border-radius: 100% 0 0 0;
+            transform-origin: left bottom;
+            transform: scaleX(0.8);
+        }
+
+        .branch-right-outer {
+            position: absolute;
+            bottom: 0;
+            right: -84%;
+            width: 100%;
+            height: 100%;
+            border-left: 12px solid #bbb; /* 外側レール */
+            border-radius: 100% 0 0 0;
+            transform-origin: left bottom;
+            transform: scaleX(0.8);
+        }
+
+        /* 分岐用枕木 */
+        .branch-sleeper {
+            position: absolute;
+            height: 30px;
+            background: #4a3c31;
+            transform-origin: center;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+        }
+
+        /* アニメーション */
+        @keyframes move-forward {
+            from { transform: translateY(0px); }
+            to { transform: translateY(160px); }
+        }
+
+        .moving .sleeper-container {
+            animation: move-forward 0.3s linear infinite;
+        }
+
+        /* トロッコのコックピット（手前） */
+        .cockpit {
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(to top, #334155, transparent);
+            border-top: 4px solid #64748b;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* 爆発演出 */
+        .exploding {
+            animation: violent-shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+
+        @keyframes violent-shake {
+            10%, 90% { transform: translate3d(-5px, 0, 0) rotate(2deg); }
+            20%, 80% { transform: translate3d(10px, 0, 0) rotate(-2deg); }
+            30%, 50%, 70% { transform: translate3d(-20px, -10px, 0) rotate(5deg); }
+            40%, 60% { transform: translate3d(20px, 10px, 0) rotate(-5deg); }
+        }
+
+        /* 爆発フラッシュ */
+        .flash-overlay {
+            position: fixed;
+            inset: 0;
+            background: white;
+            z-index: 300;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        .flash-active {
+            animation: flash-bang 0.8s ease-out forwards;
+        }
+
+        @keyframes flash-bang {
+            0% { background: white; opacity: 1; }
+            20% { background: #ffaa00; opacity: 0.8; }
+            50% { background: #ff4500; opacity: 0.5; }
+            100% { background: #000; opacity: 1; } /* 暗転 */
+        }
+
+        /* 破片 */
+        .debris {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #aaa;
+            z-index: 120;
+            pointer-events: none;
+        }
+
+        /* UI */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            background: rgba(0,0,0,0.8);
+        }
+
+        .choice-zone {
+            position: absolute;
+            bottom: 300px; /* 線路の近くに配置 */
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 400px; /* レールの左右に配置 */
+            z-index: 150;
+            pointer-events: none;
+            perspective: 800px; /* 3D効果用 */
+        }
+
+        .choice-card {
+            background: rgba(142, 68, 173, 0.9);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            width: 300px;
+            text-align: center;
+            border: 3px solid white;
+            box-shadow: 0 0 30px rgba(142, 68, 173, 0.5);
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.3s;
+            /* 看板のように少し傾ける */
+            transform: rotateX(10deg); 
+        }
+        
+        .choice-card:hover {
+            transform: rotateX(0deg) scale(1.1) translateY(-10px);
+            background: #9b59b6;
+            box-shadow: 0 0 50px rgba(155, 89, 182, 0.8);
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="world" id="world">
+        <div class="camera-rig" id="cameraRig">
+            <div class="track-system moving" id="trackSystem">
+                <div class="sleeper-container" id="sleeperContainer">
+                    <!-- 枕木はJSで生成 -->
+                </div>
+                <!-- メインレール -->
+                <div class="rail rail-left"></div>
+                <div class="rail rail-right"></div>
+                
+                <!-- 分岐システム -->
+                <div class="branch-system" id="branchSystem">
+                    <!-- 左分岐 -->
+                    <div class="branch-left"></div>
+                    <div class="branch-left-outer"></div>
+                    <div id="leftSleepers"></div>
+
+                    <!-- 右分岐 -->
+                    <div class="branch-right"></div>
+                    <div class="branch-right-outer"></div>
+                    <div id="rightSleepers"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- プレイヤーのコックピット視点 -->
+        <div class="cockpit">
+            <div class="absolute bottom-8 left-10 text-xl font-bold text-blue-300">SYSTEM: ONLINE</div>
+            <div class="absolute bottom-8 right-10 text-xl font-bold text-purple-400">SCORE: <span id="scoreDisplay">0</span></div>
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
+                <div id="progressBar" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 問題表示 -->
+        <div id="questionUI" class="absolute top-10 left-1/2 -translate-x-1/2 w-full flex flex-col items-center z-[110] pointer-events-none">
+            <div class="bg-black/80 border-2 border-white p-6 rounded-xl max-w-2xl text-center backdrop-blur-md">
+                <div id="category" class="text-xs text-blue-400 font-bold mb-2 tracking-widest">MBA CORE KNOWLEDGE</div>
+                <h2 id="questionText" class="text-2xl font-bold mb-0">出発してください</h2>
+            </div>
+        </div>
+
+        <!-- 選択肢（線路の左右に対応） -->
+        <div class="choice-zone hidden" id="choiceZone">
+            <div class="choice-card" onclick="handleSelect(0)">
+                <div class="text-xs opacity-80 mb-1">← LEFT TRACK</div>
+                <div id="choice0Text" class="text-lg font-bold">...</div>
+            </div>
+            <div class="choice-card" onclick="handleSelect(1)">
+                <div class="text-xs opacity-80 mb-1">RIGHT TRACK →</div>
+                <div id="choice1Text" class="text-lg font-bold">...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- スタート画面 -->
+    <div id="startScreen" class="overlay">
+        <h1 class="text-6xl font-black mb-4 text-white italic tracking-tighter">MBA<br>EXPRESS</h1>
+        <p class="mb-10 text-blue-300">一人称視点で挑む経営判断の分岐点</p>
+        <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white px-16 py-5 rounded-full text-2xl font-black transition-all transform hover:scale-110 shadow-lg shadow-blue-500/50">
+            ENGINE START
+        </button>
+    </div>
+
+    <!-- ゲームオーバー画面 -->
+    <div id="gameOverScreen" class="overlay hidden">
+        <h2 class="text-7xl font-black text-red-600 mb-4">DERAILED</h2>
+        <p id="failReason" class="text-xl text-gray-300 mb-10 text-center px-10">不適切な意思決定により、プロジェクトは崩壊しました。</p>
+        <button onclick="location.reload()" class="bg-white text-black px-12 py-4 rounded-full font-bold text-xl hover:bg-gray-200">
+            RETRY
+        </button>
+    </div>
+
+    <script>
+        const questionsSource = [
+            { q: "貸借対照表(B/S)の右側に記載されるのは？", c: ["資産の部", "負債・純資産の部"], a: 1 },
+            { q: "損益計算書(P/L)で、売上高から売上原価を引いたものは？", c: ["売上総利益", "営業利益"], a: 0 },
+            { q: "キャッシュフロー計算書で、本業の儲けを示すのは？", c: ["営業CF", "投資CF"], a: 0 },
+            { q: "ROE（自己資本利益率）の計算式は？", c: ["当期純利益 ÷ 自己資本", "売上高 ÷ 総資産"], a: 0 },
+            { q: "ROA（総資産利益率）が高いほど何が良いとされる？", c: ["資産の効率性", "負債の安全性"], a: 0 },
+            { q: "流動比率が示唆する企業の安全性指標は？", c: ["短期的な支払い能力", "長期的な収益性"], a: 0 },
+            { q: "自己資本比率が高い企業の特徴は？", c: ["倒産リスクが低い", "成長性が著しく高い"], a: 0 },
+            { q: "損益分岐点（BEP）売上高を求める計算式は？", c: ["固定費 ÷ 限界利益率", "変動費 ÷ 売上高"], a: 0 },
+            { q: "限界利益とは何か？", c: ["売上高 - 変動費", "売上高 - 固定費"], a: 0 },
+            { q: "サンクコスト（埋没費用）への正しい対処は？", c: ["意思決定時に無視する", "回収するために投資を続ける"], a: 0 },
+            { q: "機会費用（オポチュニティ・コスト）とは？", c: ["最善の選択肢を選ばなかったことで失った利益", "将来発生する可能性のある費用"], a: 0 },
+            { q: "現在価値（PV）を求める際に割り引くために使う率は？", c: ["割引率", "利回り"], a: 0 },
+            { q: "NPV（正味現在価値）法で投資すべき基準は？", c: ["NPV > 0", "NPV < 0"], a: 0 },
+            { q: "IRR（内部収益率）法で投資すべき基準は？", c: ["IRR > 資本コスト", "IRR < 資本コスト"], a: 0 },
+            { q: "WACC（加重平均資本コスト）は何のコスト？", c: ["資金調達にかかるコスト", "製造にかかる変動費"], a: 0 },
+            { q: "CAPM理論において、リスクフリーレートに加算されるのは？", c: ["マーケット・リスクプレミアム × ベータ", "期待収益率 × 標準偏差"], a: 0 },
+            { q: "ベータ値（β）が示すものは？", c: ["市場全体に対する個別銘柄の感応度", "企業の負債比率"], a: 0 },
+            { q: "DCF法で企業価値を算出する際に見積もる期間後の価値は？", c: ["継続価値（ターミナルバリュー）", "残存簿価"], a: 0 },
+            { q: "EBITDA（金利・税金・償却前利益）が重視される理由は？", c: ["国際的な収益力の比較が容易", "税金対策になるから"], a: 0 },
+            { q: "PER（株価収益率）の計算式は？", c: ["株価 ÷ 一株当たり純利益(EPS)", "株価 ÷ 一株当たり純資産(BPS)"], a: 0 },
+            { q: "PBR（株価純資産倍率）が1倍を割れる意味は？", c: ["解散価値を下回っている", "非常に割高である"], a: 0 },
+            { q: "レバレッジ効果とは何を梃子（てこ）にする効果？", c: ["負債", "従業員数"], a: 0 },
+            { q: "MM理論（モディリアーニ＝ミラー定理）の命題は？", c: ["完全市場では資本構成は企業価値に無関係", "負債を増やすほど企業価値は無限に上がる"], a: 0 },
+            { q: "IPOとは何の略？", c: ["Initial Public Offering", "International Price Organization"], a: 0 },
+            { q: "M&Aにおける「デューデリジェンス」とは？", c: ["買収対象企業の詳細な資産査定", "買収後の経営統合プロセス"], a: 0 },
+            { q: "敵対的買収への防衛策「ポイズンピル」の効果は？", c: ["新株を発行して買収者の持株比率を下げる", "株主総会を延期する"], a: 0 },
+            { q: "「のれん（Goodwill）」が発生するのはいつ？", c: ["純資産額を上回る価格で買収した時", "赤字企業を買収した時"], a: 0 },
+            { q: "配当性向の計算式は？", c: ["配当金総額 ÷ 当期純利益", "配当金総額 ÷ 売上高"], a: 0 },
+            { q: "自社株買いの効果として正しいのは？", c: ["EPS（一株当たり利益）が上昇する", "自己資本が増加する"], a: 0 },
+            { q: "ブラック・ショールズ・モデルは何の評価に使われる？", c: ["オプション価格", "不動産価格"], a: 0 }
+        ];
+
+        let questions = [];
+
+        // シャッフル関数
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        let currentQ = 0;
+        let score = 0;
+        let isMoving = false;
+
+        // メイン枕木の生成
+        const sleeperContainer = document.getElementById('sleeperContainer');
+        for (let i = 0; i < 30; i++) {
+            const s = document.createElement('div');
+            s.className = 'sleeper';
+            s.style.top = (i * 80) + 'px';
+            sleeperContainer.appendChild(s);
+        }
+
+        // 分岐枕木の生成
+        function generateBranchSleepers(containerId, isLeft) {
+            const container = document.getElementById(containerId);
+            const count = 20;
+            const radius = 1000; // CSSのborder-radiusに合わせる（近似値）
+            
+            for (let i = 0; i < count; i++) {
+                const s = document.createElement('div');
+                s.className = 'branch-sleeper';
+                s.style.width = '340px'; // メインと同じ幅
+                
+                // カーブに沿って配置（簡易計算）
+                // 進行度t (0 -> 1)
+                const t = i / count;
+                const angleDeg = t * 45; // 45度くらいまで描画
+                const angleRad = angleDeg * (Math.PI / 180);
+
+                // 位置計算 (円周上の点)
+                // Left: 原点は右下 (100%, 100%)
+                // Right: 原点は左下 (0%, 100%)
+                
+                let x, y, rot;
+
+                if (isLeft) {
+                    // 左カーブ
+                    // 中心(0, 0)から半径Rの円弧
+                    // CSS: right bottom origin -> x=0 is right edge
+                    // 座標系調整が必要。CSSのtransform-originに合わせて計算
+                    // 基点は bottom: 0, left: -50% (main center)
+                    // うまく合わせるのが難しいので、見た目調整で配置
+                    
+                    // シンプルに直線からのオフセットで配置
+                    const yPos = 1000 - (i * 50); // 下から上へ
+                    const xOffset = Math.pow(i, 2) * 1.5; // 2次関数で近似カーブ
+                    
+                    s.style.bottom = (i * 50) + 'px';
+                    s.style.right = (50 + i * 2) + '%'; 
+                    // これだと難しいので、CSSのカーブには合わせず、JSで配置計算
+                    
+                    // 実装方針変更：CSSのborderに合わせるのではなく、視覚的にそれっぽい位置に置く
+                    s.style.bottom = (i * 60) + 'px'; // 下から
+                    // 左へカーブ
+                    s.style.left = '50%';
+                    s.style.transform = `translateX(-50%) translateX(-${Math.pow(i, 1.8) * 1.5}px) rotate(-${i * 1.5}deg)`;
+                } else {
+                    // 右カーブ
+                    s.style.bottom = (i * 60) + 'px';
+                    s.style.left = '50%';
+                    // 右へカーブ
+                    s.style.transform = `translateX(-50%) translateX(${Math.pow(i, 1.8) * 1.5}px) rotate(${i * 1.5}deg)`;
+                }
+
+                container.appendChild(s);
+            }
+        }
+
+        generateBranchSleepers('leftSleepers', true);
+        generateBranchSleepers('rightSleepers', false);
+
+        function startGame() {
+            // 問題をシャッフルしてセット
+            questions = shuffle([...questionsSource]);
+            currentQ = 0;
+            score = 0;
+            document.getElementById('scoreDisplay').innerText = score;
+            
+            document.getElementById('startScreen').classList.add('hidden');
+            isMoving = true;
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            if (currentQ >= questions.length) {
+                alert("全線開通！MBAマスターです！");
+                location.reload();
+                return;
+            }
+
+            const q = questions[currentQ];
+            document.getElementById('questionText').innerText = q.q;
+            document.getElementById('choice0Text').innerText = q.c[0];
+            document.getElementById('choice1Text').innerText = q.c[1];
+            
+            // UI表示
+            document.getElementById('choiceZone').classList.remove('hidden');
+            document.getElementById('trackSystem').classList.add('branching');
+            
+            // カメラを中央にリセット
+            document.getElementById('cameraRig').style.transform = "rotateY(0deg) translateX(0)";
+            
+            updateProgress();
+        }
+
+        function handleSelect(choiceIdx) {
+            if (!isMoving) return;
+            
+            const q = questions[currentQ];
+            const rig = document.getElementById('cameraRig');
+            
+            // 選択した方向へカメラを向ける（正面視点の維持）
+            // カーブに沿ってカメラ自体を移動・回転させる
+            if (choiceIdx === 0) {
+                // 左へ: 位置を左へずらし、Y軸回転で視線を左へ向ける
+                // 最終的にレールが正面に来るように
+                rig.style.transform = "translateX(-300px) rotateY(-25deg) translateZ(100px)";
+            } else {
+                // 右へ
+                rig.style.transform = "translateX(300px) rotateY(25deg) translateZ(100px)";
+            }
+
+            // 少し待ってから判定（移動演出のため）
+            setTimeout(() => {
+                if (choiceIdx === q.a) {
+                    // 正解
+                    score += 100;
+                    document.getElementById('scoreDisplay').innerText = score;
+                    currentQ++;
+                    
+                    // 分岐を解除して次へ
+                    document.getElementById('trackSystem').classList.remove('branching');
+                    document.getElementById('choiceZone').classList.add('hidden');
+                    
+                    setTimeout(nextQuestion, 600);
+                } else {
+                    // 不正解 -> 脱線
+                    crash();
+                }
+            }, 800); // アニメーション時間を少し延長
+        }
+
+        function crash() {
+            isMoving = false;
+            const rig = document.getElementById('cameraRig');
+            const world = document.getElementById('world');
+
+            // 爆発フラッシュ
+            const flash = document.createElement('div');
+            flash.className = 'flash-overlay flash-active';
+            document.body.appendChild(flash);
+
+            // 激しい揺れ
+            rig.classList.add('exploding');
+            
+            // 破片生成
+            for(let i=0; i<30; i++) {
+                createDebris(world);
+            }
+
+            // 背景停止
+            document.getElementById('trackSystem').classList.remove('moving');
+
+            // ゲームオーバー画面
+            setTimeout(() => {
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+                document.getElementById('failReason').innerText = `「${questions[currentQ].q}」の判断ミスにより爆発四散。正解は「${questions[currentQ].c[questions[currentQ].a]}」でした。`;
+                
+                // フラッシュ削除
+                setTimeout(() => flash.remove(), 1000);
+            }, 1000);
+        }
+
+        function createDebris(container) {
+            const d = document.createElement('div');
+            d.className = 'debris';
+            
+            // ランダムな位置（画面中心付近から）
+            const startX = window.innerWidth / 2;
+            const startY = window.innerHeight / 2 + 100;
+            
+            d.style.left = startX + 'px';
+            d.style.top = startY + 'px';
+            
+            // ランダムな色とサイズ
+            const size = Math.random() * 30 + 10;
+            d.style.width = size + 'px';
+            d.style.height = size + 'px';
+            d.style.background = Math.random() > 0.5 ? '#ff5500' : '#555';
+            d.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+            
+            container.appendChild(d);
+
+            // 飛び散るアニメーション (WAAPI)
+            const angle = Math.random() * Math.PI * 2;
+            const velocity = Math.random() * 500 + 200;
+            const tx = Math.cos(angle) * velocity;
+            const ty = Math.sin(angle) * velocity;
+            const rot = Math.random() * 720;
+
+            d.animate([
+                { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+                { transform: `translate(${tx}px, ${ty}px) rotate(${rot}deg)`, opacity: 0 }
+            ], {
+                duration: 1000 + Math.random() * 500,
+                easing: 'cubic-bezier(0, .9, .57, 1)',
+                fill: 'forwards'
+            }).onfinish = () => d.remove();
+        }
+
+        function updateProgress() {
+            const percent = (currentQ / questions.length) * 100;
+            document.getElementById('progressBar').style.width = percent + "%";
+        }
+    </script>
+</body>
+</html>
