@@ -257,7 +257,37 @@
             box-shadow: 0 0 50px rgba(155, 89, 182, 0.8);
         }
 
-        .hidden { display: none !important; }
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .track-system {
+                transform: translateX(-50%) rotateX(75deg) scale(0.6);
+                bottom: 50px; /* Adjust vertical position after scaling */
+            }
+
+            .choice-zone {
+                gap: 2rem;
+                bottom: 250px;
+            }
+
+            .choice-card {
+                width: 40vw;
+                padding: 1rem;
+                font-size: 0.9rem;
+            }
+
+            .cockpit {
+                height: 120px;
+            }
+
+            #questionUI {
+                top: 5rem;
+                width: 90%;
+            }
+
+            #questionText {
+                font-size: 1.25rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -289,18 +319,18 @@
 
         <!-- プレイヤーのコックピット視点 -->
         <div class="cockpit">
-            <div class="absolute bottom-8 left-10 text-xl font-bold text-blue-300">SYSTEM: ONLINE</div>
-            <div class="absolute bottom-8 right-10 text-xl font-bold text-purple-400">SCORE: <span id="scoreDisplay">0</span></div>
-            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div class="absolute bottom-8 left-4 md:left-10 text-sm md:text-xl font-bold text-blue-300">SYSTEM: ONLINE</div>
+            <div class="absolute bottom-8 right-4 md:right-10 text-sm md:text-xl font-bold text-purple-400">SCORE: <span id="scoreDisplay">0</span></div>
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-48 md:w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
                 <div id="progressBar" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
             </div>
         </div>
 
         <!-- 問題表示 -->
-        <div id="questionUI" class="absolute top-10 left-1/2 -translate-x-1/2 w-full flex flex-col items-center z-[110] pointer-events-none">
-            <div class="bg-black/80 border-2 border-white p-6 rounded-xl max-w-2xl text-center backdrop-blur-md">
-                <div id="category" class="text-xs text-blue-400 font-bold mb-2 tracking-widest">MBA CORE KNOWLEDGE</div>
-                <h2 id="questionText" class="text-2xl font-bold mb-0">出発してください</h2>
+        <div id="questionUI" class="absolute top-10 left-1/2 -translate-x-1/2 w-full flex flex-col items-center z-[110] pointer-events-none px-4">
+            <div class="bg-black/80 border-2 border-white p-4 md:p-6 rounded-xl w-full max-w-2xl text-center backdrop-blur-md">
+                <div id="category" class="text-[0.6rem] md:text-xs text-blue-400 font-bold mb-2 tracking-widest">MBA CORE KNOWLEDGE</div>
+                <h2 id="questionText" class="text-lg md:text-2xl font-bold mb-0">出発してください</h2>
             </div>
         </div>
 
@@ -308,29 +338,29 @@
         <div class="choice-zone hidden" id="choiceZone">
             <div class="choice-card" onclick="handleSelect(0)">
                 <div class="text-xs opacity-80 mb-1">← LEFT TRACK</div>
-                <div id="choice0Text" class="text-lg font-bold">...</div>
+                <div id="choice0Text" class="text-base md:text-lg font-bold">...</div>
             </div>
             <div class="choice-card" onclick="handleSelect(1)">
                 <div class="text-xs opacity-80 mb-1">RIGHT TRACK →</div>
-                <div id="choice1Text" class="text-lg font-bold">...</div>
+                <div id="choice1Text" class="text-base md:text-lg font-bold">...</div>
             </div>
         </div>
     </div>
 
     <!-- スタート画面 -->
     <div id="startScreen" class="overlay">
-        <h1 class="text-6xl font-black mb-4 text-white italic tracking-tighter">MBA<br>EXPRESS</h1>
-        <p class="mb-10 text-blue-300">一人称視点で挑む経営判断の分岐点</p>
-        <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white px-16 py-5 rounded-full text-2xl font-black transition-all transform hover:scale-110 shadow-lg shadow-blue-500/50">
+        <h1 class="text-4xl md:text-6xl font-black mb-4 text-white italic tracking-tighter text-center">MBA<br>EXPRESS</h1>
+        <p class="mb-10 text-blue-300 text-sm md:text-base text-center px-4">一人称視点で挑む経営判断の分岐点</p>
+        <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white px-10 md:px-16 py-4 md:py-5 rounded-full text-lg md:text-2xl font-black transition-all transform hover:scale-110 shadow-lg shadow-blue-500/50">
             ENGINE START
         </button>
     </div>
 
     <!-- ゲームオーバー画面 -->
     <div id="gameOverScreen" class="overlay hidden">
-        <h2 class="text-7xl font-black text-red-600 mb-4">DERAILED</h2>
-        <p id="failReason" class="text-xl text-gray-300 mb-10 text-center px-10">不適切な意思決定により、プロジェクトは崩壊しました。</p>
-        <button onclick="location.reload()" class="bg-white text-black px-12 py-4 rounded-full font-bold text-xl hover:bg-gray-200">
+        <h2 class="text-5xl md:text-7xl font-black text-red-600 mb-4">DERAILED</h2>
+        <p id="failReason" class="text-sm md:text-xl text-gray-300 mb-10 text-center px-6 max-w-lg">不適切な意思決定により、プロジェクトは崩壊しました。</p>
+        <button onclick="location.reload()" class="bg-white text-black px-8 md:px-12 py-3 md:py-4 rounded-full font-bold text-lg md:text-xl hover:bg-gray-200">
             RETRY
         </button>
     </div>
@@ -494,16 +524,20 @@
             
             // 選択した方向へカメラを向ける（正面視点の維持）
             // カーブに沿ってカメラ自体を移動・回転させる
+            // モバイルかどうかで移動量を調整
+            const isMobile = window.innerWidth < 768;
+            const moveAmt = isMobile ? 120 : 300; // モバイルなら移動量を抑える
+
             if (choiceIdx === 0) {
-                // 左へ: 位置を左へずらし、Y軸回転で視線を左へ向ける
-                // 最終的にレールが正面に来るように
-                rig.style.transform = "translateX(-300px) rotateY(-25deg) translateZ(100px)";
+                // 左へ
+                rig.style.transform = `translateX(-${moveAmt}px) rotateY(-25deg) translateZ(100px)`;
             } else {
                 // 右へ
-                rig.style.transform = "translateX(300px) rotateY(25deg) translateZ(100px)";
+                rig.style.transform = `translateX(${moveAmt}px) rotateY(25deg) translateZ(100px)`;
             }
 
             // 少し待ってから判定（移動演出のため）
+
             setTimeout(() => {
                 if (choiceIdx === q.a) {
                     // 正解
